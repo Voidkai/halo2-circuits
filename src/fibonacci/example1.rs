@@ -1,5 +1,6 @@
 use std::marker::PhantomData;
-use halo2_proofs::{arithmetic::FieldExt, circuit::*, plonk::*, poly::Rotation};
+use halo2_proofs::{circuit::*, plonk::*, poly::Rotation};
+use halo2_proofs::arithmetic::Field;
 
 // Define FibonacciConfig, which include five columns, col_a+col_b=col_c and constraint selector and instance column.
 #[derive(Debug, Clone)]
@@ -13,12 +14,12 @@ struct FibonacciConfig {
 
 // Define FibonacciChip, which is a Fibonacci computation operation set, including a config and _marker. 
 #[derive(Debug, Clone)]
-struct FibonacciChip<F: FieldExt> {
+struct FibonacciChip<F: Field> {
     config: FibonacciConfig,
     _marker: PhantomData<F>,
 }
 
-impl<F: FieldExt> FibonacciChip<F> {
+impl<F: Field> FibonacciChip<F> {
     pub fn construct(config: FibonacciConfig) -> Self {
         Self {
             config,
@@ -153,7 +154,7 @@ impl<F: FieldExt> FibonacciChip<F> {
 #[derive(Default)]
 struct MyCircuit<F>(PhantomData<F>);
 
-impl<F: FieldExt> Circuit<F> for MyCircuit<F> {
+impl<F: Field> Circuit<F> for MyCircuit<F> {
     type Config = FibonacciConfig;
     type FloorPlanner = SimpleFloorPlanner;
 

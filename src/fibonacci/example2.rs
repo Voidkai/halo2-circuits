@@ -1,8 +1,9 @@
-use halo2_proofs::{arithmetic::FieldExt, circuit::*, plonk::*, poly::Rotation};
+use halo2_proofs::{ circuit::*, plonk::*, poly::Rotation};
 use std::marker::PhantomData;
+use halo2_proofs::arithmetic::Field;
 
 #[derive(Debug, Clone)]
-struct ACell<F: FieldExt>(AssignedCell<F, F>);
+struct ACell<F: Field>(AssignedCell<F, F>);
 
 #[derive(Debug, Clone)]
 struct FibonacciConfig {
@@ -12,12 +13,12 @@ struct FibonacciConfig {
 }
 
 #[derive(Debug, Clone)]
-struct FibonacciChip<F: FieldExt> {
+struct FibonacciChip<F: Field> {
     config: FibonacciConfig,
     _marker: PhantomData<F>,
 }
 
-impl<F: FieldExt> FibonacciChip<F> {
+impl<F: Field> FibonacciChip<F> {
     pub fn construct(config: FibonacciConfig) -> Self {
         Self {
             config,
@@ -117,7 +118,7 @@ impl<F: FieldExt> FibonacciChip<F> {
 #[derive(Default)]
 struct MyCircuit<F>(PhantomData<F>);
 
-impl<F: FieldExt> Circuit<F> for MyCircuit<F> {
+impl<F: Field> Circuit<F> for MyCircuit<F> {
     type Config = FibonacciConfig;
     type FloorPlanner = SimpleFloorPlanner;
 

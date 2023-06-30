@@ -1,102 +1,136 @@
-use crate::is_zero::{IsZeroChip, IsZeroConfig};
-use halo2_proofs::{
-    arithmetic::FieldExt,
-    circuit::{AssignedCell, Layouter, SimpleFloorPlanner, Value},
-    plonk::{Advice, Circuit, Column, ConstraintSystem, Error, Expression, Selector},
-    poly::Rotation,
-};
+use halo2_proofs::{ circuit::*, plonk::*, poly::Rotation};
+use std::marker::PhantomData;
+use halo2_proofs::arithmetic::Field;
 
 #[derive(Debug, Clone)]
-struct FunctionConfig<F: FieldExt> {
+struct ACell<F: Field>(AssignedCell<F, F>);
+
+// Fibonacci variant: x_1*x_2+x_2*x_3=x_4
+#[derive(Debug, Clone)]
+struct FibonacciConfig {
+    advice: Column<Advice>,
     selector: Selector,
-    a: Column<Advice>,
-    b: Column<Advice>,
-    c: Column<Advice>,
-    a_equals_b: IsZeroConfig<F>,
-    output: Column<Advice>,
+    instance: Column<Instance>,
 }
 
 #[derive(Debug, Clone)]
-struct FunctionChip<F: FieldExt> {
-    config: FunctionConfig<F>,
+struct FibonacciChip<F: Field> {
+    config: FibonacciConfig,
+    _marker: PhantomData<F>,
 }
 
-impl<F: FieldExt> FunctionChip<F> {
-    pub fn construct(config: FunctionConfig<F>) -> Self {
-        Self { config }
+impl<F: Field> FibonacciChip<F> {
+    pub fn construct(config: FibonacciConfig) -> Self {
+        Self {
+            config,
+            _marker: PhantomData,
+        }
     }
 
-    pub fn configure(meta: &mut ConstraintSystem<F>) -> FunctionConfig<F> {
+    pub fn configure(
+        meta: &mut ConstraintSystem<F>,
+        // advice: Column<Advice>,
+        // instance: Column<Instance>,
+    ) -> FibonacciConfig {
         let selector = meta.selector();
-        let a = meta.advice_column();
-        let b = meta.advice_column();
-        let c = meta.advice_column();
-        let output = meta.advice_column();
+        let advice = meta.advice_column();
+        let instance = meta.instance_column();
+        meta.enable_equality(advice);
+        meta.enable_equality(instance);
 
-        let is_zero_advice_column = meta.advice_column();
-        let a_equals_b = IsZeroChip::configure(
-            meta,
-            |meta| meta.query_selector(selector),
-            |meta| meta.query_advice(a, Rotation::cur()) - meta.query_advice(b, Rotation::cur()),
-            is_zero_advice_column,
-        );
-
-        meta.create_gate("f(a, b, c) = if a == b {c} else {a - b}", |meta| {
+        meta.create_gate("add", |meta| {
+            //
+            // advice | selector
+            //   a    |   s
+            //   b    |
+            //   c    |
+            //
             let s = meta.query_selector(selector);
-            let a = meta.query_advice(a, Rotation::cur());
-            let b = meta.query_advice(b, Rotation::cur());
-            let c = meta.query_advice(c, Rotation::cur());
-            let output = meta.query_advice(output, Rotation::cur());
-            vec![
-                s.clone() * (a_equals_b.expr() * (output.clone() - c)),
-                s * (Expression::Constant(F::one()) - a_equals_b.expr()) * (output - (a - b)),
-            ]
+            let a = meta.query_advice(advice, Rotation::cur());
+            let b = meta.query_advice(advice, Rotation::next());
+            let c = meta.query_advice(advice, Rotation(2));
+            let d = meta.query_advice(advice, Rotation(3));
+            vec![s * (a *b.clone() + b * c - d)]
         });
 
-        FunctionConfig {
+        FibonacciConfig {
+            advice,
             selector,
-            a,
-            b,
-            c,
-            a_equals_b,
-            output,
+            instance,
         }
     }
 
     pub fn assign(
         &self,
         mut layouter: impl Layouter<F>,
-        a: F,
-        b: F,
-        c: F,
+        nrows: usize,
     ) -> Result<AssignedCell<F, F>, Error> {
-        let is_zero_chip = IsZeroChip::construct(self.config.a_equals_b.clone());
-
         layouter.assign_region(
-            || "f(a, b, c) = if a == b {c} else {a - b}",
+            || "entire fibonacci table",
             |mut region| {
                 self.config.selector.enable(&mut region, 0)?;
-                region.assign_advice(|| "a", self.config.a, 0, || Value::known(a))?;
-                region.assign_advice(|| "b", self.config.b, 0, || Value::known(b))?;
-                region.assign_advice(|| "c", self.config.c, 0, || Value::known(c))?;
-                is_zero_chip.assign(&mut region, 0, Value::known(a - b))?;
 
-                let output = if a == b { c } else { a - b };
-                region.assign_advice(|| "output", self.config.output, 0, || Value::known(output))
+                let mut a_cell = region.assign_advice_from_instance(
+                    || "1",
+                    self.config.instance,
+                    0,
+                    self.config.advice,
+                    0,
+                )?;
+                let mut b_cell = region.assign_advice_from_instance(
+                    || "2",
+                    self.config.instance,
+                    1,
+                    self.config.advice,
+                    1,
+                )?;
+
+                let mut c_cell = region.assign_advice_from_instance(
+                    || "3",
+                    self.config.instance,
+                    2,
+                    self.config.advice,
+                    2,
+                )?;
+                for row in 1..nrows{
+                    if row < nrows - 3 {
+                        self.config.selector.enable(&mut region, row)?;
+                    }
+                }
+
+                for row in 3..nrows {
+                    let d_cell = region.assign_advice(
+                        || "advice",
+                        self.config.advice,
+                        row,
+                        || a_cell.value().copied() * b_cell.value().copied() + b_cell.value().copied()*c_cell.value().copied(),
+                    )?;
+
+                    a_cell = b_cell;
+                    b_cell = c_cell;
+                    c_cell = d_cell;
+                }
+
+                Ok(c_cell)
             },
         )
+    }
+
+    pub fn expose_public(
+        &self,
+        mut layouter: impl Layouter<F>,
+        cell: AssignedCell<F, F>,
+        row: usize,
+    ) -> Result<(), Error> {
+        layouter.constrain_instance(cell.cell(), self.config.instance, row)
     }
 }
 
 #[derive(Default)]
-struct FunctionCircuit<F> {
-    a: F,
-    b: F,
-    c: F,
-}
+struct MyCircuit<F>(PhantomData<F>);
 
-impl<F: FieldExt> Circuit<F> for FunctionCircuit<F> {
-    type Config = FunctionConfig<F>;
+impl<F: Field> Circuit<F> for MyCircuit<F> {
+    type Config = FibonacciConfig;
     type FloorPlanner = SimpleFloorPlanner;
 
     fn without_witnesses(&self) -> Self {
@@ -104,30 +138,62 @@ impl<F: FieldExt> Circuit<F> for FunctionCircuit<F> {
     }
 
     fn configure(meta: &mut ConstraintSystem<F>) -> Self::Config {
-        FunctionChip::configure(meta)
+        FibonacciChip::configure(meta)
     }
 
-    fn synthesize(&self, config: Self::Config, layouter: impl Layouter<F>) -> Result<(), Error> {
-        let chip = FunctionChip::construct(config);
-        chip.assign(layouter, self.a, self.b, self.c)?;
+    fn synthesize(
+        &self,
+        config: Self::Config,
+        mut layouter: impl Layouter<F>,
+    ) -> Result<(), Error> {
+        let chip = FibonacciChip::construct(config);
+
+        let out_cell = chip.assign(layouter.namespace(|| "entire table"), 6)?;
+        chip.expose_public(layouter.namespace(|| "out"), out_cell, 3)?;
+
         Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::MyCircuit;
+    use std::marker::PhantomData;
     use halo2_proofs::{dev::MockProver, pasta::Fp};
 
     #[test]
-    fn test_example3() {
-        let circuit = FunctionCircuit {
-            a: Fp::from(10),
-            b: Fp::from(12),
-            c: Fp::from(15),
-        };
+    fn fibonacci_example3() {
+        let k = 4;
 
-        let prover = MockProver::run(4, &circuit, vec![]).unwrap();
+        let a = Fp::from(1); // F[0]
+        let b = Fp::from(2); // F[1]
+        let c = Fp::from(3);
+        let out = Fp::from(264); // F[5]
+
+        let circuit = MyCircuit(PhantomData);
+
+        let mut public_input = vec![a, b, c, out];
+
+        let prover = MockProver::run(k, &circuit, vec![public_input.clone()]).unwrap();
         prover.assert_satisfied();
+
+        // public_input[2] += Fp::one();
+        // let _prover = MockProver::run(k, &circuit, vec![public_input]).unwrap();
+        // //uncomment the following line and the assert will fail
+        // _prover.assert_satisfied();
+    }
+
+    #[cfg(feature = "dev-graph")]
+    #[test]
+    fn plot_fibo2() {
+        use plotters::prelude::*;
+        let root = BitMapBackend::new("fib-2-layout.png", (1024, 3096)).into_drawing_area();
+        root.fill(&WHITE).unwrap();
+        let root = root.titled("Fib 2 Layout", ("sans-serif", 60)).unwrap();
+
+        let circuit = MyCircuit::<Fp>(PhantomData);
+        halo2_proofs::dev::CircuitLayout::default()
+            .render(4, &circuit, &root)
+            .unwrap();
     }
 }
