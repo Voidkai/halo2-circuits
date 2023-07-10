@@ -1,8 +1,9 @@
 use std::{marker::PhantomData, ops::Mul};
 use halo2_proofs::{circuit::*, plonk::*, poly::Rotation};
 use halo2_proofs::arithmetic::Field;
+use halo2_proofs::halo2curves::FieldExt;
 
-trait NumericInstructions<F: Field>: Chip<F> {
+trait NumericInstructions<F: FieldExt>: Chip<F> {
     /// Variable representing a number.
     type Num;
 
@@ -36,7 +37,7 @@ struct FieldChip<F: Field> {
     _marker: PhantomData<F>,
 }
 
-impl<F: Field> FieldChip<F> {
+impl<F: FieldExt> FieldChip<F> {
     fn construct(config: <Self as Chip<F>>::Config) -> Self {
         Self {
             config,
@@ -96,7 +97,7 @@ impl<F: Field> FieldChip<F> {
 }
 
 
-impl<F: Field> Chip<F> for FieldChip<F> {
+impl<F: FieldExt> Chip<F> for FieldChip<F> {
     type Config = FieldConfig;
     type Loaded = ();
 
@@ -131,9 +132,9 @@ struct FieldConfig {
 
 /// A variable representing a number.
 #[derive(Clone)]
-struct Number<F: Field>(AssignedCell<F, F>);
+struct Number<F: FieldExt>(AssignedCell<F, F>);
 
-impl<F: Field> NumericInstructions<F> for FieldChip<F> {
+impl<F: FieldExt> NumericInstructions<F> for FieldChip<F> {
     type Num = Number<F>;
 
     fn load_private(
@@ -224,13 +225,13 @@ impl<F: Field> NumericInstructions<F> for FieldChip<F> {
 /// they won't have any value during key generation. During proving, if any of these
 /// were `None` we would get an error.
 #[derive(Default)]
-struct MyCircuit<F: Field> {
+struct MyCircuit<F: FieldExt> {
     constant: F,
     a: Value<F>,
     b: Value<F>,
 }
 
-impl<F: Field> Circuit<F> for MyCircuit<F> {
+impl<F: FieldExt> Circuit<F> for MyCircuit<F> {
     // Since we are using a single chip for everything, we can just reuse its config.
     type Config = FieldConfig;
     type FloorPlanner = SimpleFloorPlanner;
@@ -292,7 +293,7 @@ mod tests {
     use std::marker::PhantomData;
 
     use super::MyCircuit;
-    use halo2_proofs::{dev::MockProver, pasta::Fp};
+    use halo2_proofs::{dev::MockProver, halo2curves::pasta::Fp};
     use halo2_proofs::circuit::Value;
 
     #[test]

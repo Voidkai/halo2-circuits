@@ -149,7 +149,8 @@ impl<F: Field> Circuit<F> for MyCircuit<F> {
 mod tests {
     use super::MyCircuit;
     use std::marker::PhantomData;
-    use halo2_proofs::{dev::MockProver, pasta::Fp};
+    use halo2_proofs::{dev::MockProver};
+    use halo2_proofs::halo2curves::pasta::Fp;
 
     #[test]
     fn fibonacci_example2() {

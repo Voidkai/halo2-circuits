@@ -7,4 +7,4 @@ edition = "2021"
 
 [dependencies]
 
-halo2_proofs = "0.3.0"
+halo2_proofs = { git = "https://github.com/scroll-tech/halo2.git", branch = "develop" }

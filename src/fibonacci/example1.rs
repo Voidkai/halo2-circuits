@@ -193,7 +193,8 @@ mod tests {
     use std::marker::PhantomData;
 
     use super::MyCircuit;
-    use halo2_proofs::{dev::MockProver, pasta::Fp};
+    use halo2_proofs::{dev::MockProver};
+    use halo2_proofs::halo2curves::pasta::Fp;
 
     #[test]
     fn fibonacci_example1() {
