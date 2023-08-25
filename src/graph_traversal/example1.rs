@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 use halo2_proofs::{circuit::*, plonk::*, poly::Rotation};
 use halo2_proofs::arithmetic::Field;
 
+mod graph;
 // Define FibonacciConfig, which include five columns, col_a+col_b=col_c and constraint selector and instance column.
 #[derive(Debug, Clone)]
 struct FibonacciConfig {
@@ -12,7 +13,7 @@ struct FibonacciConfig {
     pub instance: Column<Instance>,
 }
 
-// Define FibonacciChip, which is a Fibonacci computation operation set, including a config and _marker. 
+// Define FibonacciChip, which is a Fibonacci computation operation set, including a config and _marker.
 #[derive(Debug, Clone)]
 struct FibonacciChip<F: Field> {
     config: FibonacciConfig,
@@ -197,9 +198,8 @@ mod tests {
     use halo2_proofs::halo2curves::pasta::Fp;
 
     #[test]
-    fn fibonacci_example1() {
+    fn graph_traversal_example1() {
         let k = 4;
-
         let a = Fp::from(1); // F[0]
         let b = Fp::from(1); // F[1]
         let out = Fp::from(55); // F[9]

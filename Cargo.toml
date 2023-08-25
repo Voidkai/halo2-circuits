@@ -8,3 +8,7 @@ edition = "2021"
 [dependencies]
 
 halo2_proofs = { git = "https://github.com/scroll-tech/halo2.git", branch = "develop" }
+plotters = "0.3"
+group = "0.13.0"
+[features]
+dev-graph = ["halo2_proofs/dev-graph"]

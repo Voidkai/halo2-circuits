@@ -177,6 +177,8 @@ mod tests {
     #[test]
     fn plot_fibo2() {
         use plotters::prelude::*;
+        use halo2_proofs::dev::CircuitLayout;
+
         let root = BitMapBackend::new("fib-2-layout.png", (1024, 3096)).into_drawing_area();
         root.fill(&WHITE).unwrap();
         let root = root.titled("Fib 2 Layout", ("sans-serif", 60)).unwrap();
